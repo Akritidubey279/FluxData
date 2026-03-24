@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FluxData</title>
+  <meta name="description" content="AI Data Transformation" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    /* ── Reset & Tokens (Ultra Minimal / Linear Style) ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #FAFAFA;
+      --surface: #FFFFFF;
+      --border: #EAEAEA;
+      --text: #111111;
+      --text-dim: #666666;
+      --accent: #000000;
+      --btn-primary-bg: #111111;
+      --btn-primary-text: #FFFFFF;
+      --btn-primary-bg-hover: #333333;
+      --green: #0070F3;
+      --amber: #F5A623;
+      --red: #E00;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --surface: #0A0A0A;
+        --border: #333333;
+        --text: #EDEDED;
+        --text-dim: #888888;
+        --accent: #FFFFFF;
+        --btn-primary-bg: #FFFFFF;
+        --btn-primary-text: #000000;
+        --btn-primary-bg-hover: #CCCCCC;
+        --green: #3291FF;
+      }
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    
+    .btn-ghost {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, background 0.15s;
+    }
+    .btn-ghost:hover { color: var(--text); background: var(--surface); }
+
+    .btn-secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .btn-secondary:hover { border-color: var(--text-dim); }
+
+    .btn-primary {
+      background: var(--btn-primary-bg);
+      border: 1px solid var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .btn-primary:hover { background: var(--btn-primary-bg-hover); border-color: var(--btn-primary-bg-hover); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ── Step indicator ── */
+    #step-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 32px 32px 0;
+    }
+    .step {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      transition: color 0.2s;
+    }
+    .step.active { color: var(--text); font-weight: 600; }
+    .step.done { color: var(--text); }
+    .step-sep { color: var(--border); }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 24px 80px;
+    }
+
+    .screen { display: none; width: 100%; max-width: 960px; animation: fadeIn 0.2s ease; }
+    .screen.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .screen-title {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .screen-sub {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin-bottom: 40px;
+    }
+
+    /* ── Screen 1: Input ── */
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 32px;
+    }
+    @media(max-width: 768px) { .input-grid { grid-template-columns: 1fr; } }
+
+    .field-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .field-label-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    textarea.json-input {
+      width: 100%;
+      min-height: 250px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 16px;
+      resize: none; /* Auto-resizing via JS now */
+      overflow-y: hidden; /* Removed inner scroll */
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      line-height: 1.6;
+    }
+    textarea.json-input:focus { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+    textarea.json-input.error { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
+    textarea.json-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+
+    .validation-hint {
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-top: 8px;
+      height: 16px;
+    }
+    .validation-hint.ok { color: var(--text-dim); }
+    .validation-hint.bad { color: var(--red); }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    
+    /* ── CSV Upload ── */
+    .file-upload-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .file-upload-wrapper input[type=file] {
+      font-size: 100px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* ── Mapping Preview ── */
+    .mapping-table {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .mapping-row {
+      display: grid;
+      grid-template-columns: 1fr 24px 1fr 60px;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .mapping-row:last-child { border-bottom: none; }
+    .mapping-header {
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--bg);
+    }
+    .field-name { font-family: var(--font-mono); }
+    .field-arrow { color: var(--text-dim); text-align: center; }
+    .field-value { color: var(--text-dim); font-family: var(--font-mono); font-size: 0.8rem; margin-left: 8px;}
+    
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: var(--green); }
+    .dot-amber { background: var(--amber); }
+    .dot-red   { background: var(--red); }
+
+    .meta-strip {
+      display: flex;
+      gap: 40px;
+      margin-top: 32px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .meta-item { display: flex; flex-direction: column; gap: 4px; }
+    .meta-num { font-size: 1.25rem; font-weight: 600; font-family: var(--font-mono); }
+    .meta-lbl { font-size: 0.8rem; color: var(--text-dim); }
+
+    /* ── Result ── */
+    .json-output {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    .save-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .save-strip input {
+      flex: 1;
+      width: 250px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: var(--text);
+      outline: none;
+    }
+    .save-strip input:focus { border-color: var(--text); }
+
+    /* ── Loading ── */
+    #loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #loading-overlay.show { display: flex; }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--text);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text);
+      color: var(--bg);
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 500;
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Utility ── */
+    .flex { display: flex; }
+    .gap-8 { gap: 8px; }
+    .items-center { align-items: center; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">FluxData</div>
+    <div class="header-actions">
+      <select id="saved-mappings" class="btn-ghost" style="appearance: none; outline: none;">
+        <option value="" disabled selected>Saved Mappings</option>
+      </select>
+      <button class="btn-secondary" onclick="goToScreen(1)">New Transform</button>
+    </div>
+  </header>
+
+  <div id="step-bar">
+    <div class="step active" id="s1">Input</div>
+    <div class="step-sep" id="l1">/</div>
+    <div class="step" id="s2">Review</div>
+    <div class="step-sep" id="l2">/</div>
+    <div class="step" id="s3">Result</div>
+  </div>
+
+  <main>
+    <!-- Screen 1: Input -->
+    <div class="screen active" id="screen-1">
+      <h1 class="screen-title">Transform Data</h1>
+      <p class="screen-sub">Paste JSON, upload a CSV, or load a saved mapping instantly.</p>
+
+      <div class="input-grid">
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">Source Data</span>
+            <div class="flex gap-8 items-center">
+              <button class="btn-ghost" style="padding:4px 8px; font-size:0.75rem;" onclick="clearInput('source-input')">Clear</button>
+              <div class="file-upload-wrapper">
+                <button class="btn-secondary" style="padding:4px 10px; font-size:0.75rem;">Upload CSV</button>
+                <input type="file" accept=".csv" id="csv-upload" />
+              </div>
+            </div>
+          </div>
+          <textarea id="source-input" class="json-input" placeholder='Paste JSON array or object here...'></textarea>
+          <div class="validation-hint" id="source-hint"></div>
+        </div>
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">Target Schema</span>
+            <button class="btn-ghost" style="padding:4px 8px; font-size:0.75rem;" onclick="clearInput('schema-input')">Clear</button>
+          </div>
+          <textarea id="schema-input" class="json-input" placeholder='{
+  "customer_id": "string",
+  "email": "string"
+}'></textarea>
+          <div class="validation-hint" id="schema-hint"></div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-ghost" id="btn-load-example">Load Example</button>
+        <button class="btn-primary" id="btn-transform" disabled>Transform →</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: Preview -->
+    <div class="screen" id="screen-2">
+      <h1 class="screen-title">Review Mapping</h1>
+      <p class="screen-sub">Verify exactly how the AI paired your source data semantics to your target schema before finalizing.</p>
+
+      <div class="mapping-table">
+        <div class="mapping-row mapping-header">
+          <span>Source Field</span>
+          <span></span>
+          <span>Target Schema</span>
+          <span style="text-align:center">Match</span>
+        </div>
+        <div id="mapping-rows"></div>
+      </div>
+
+      <div class="meta-strip" id="mapping-meta"></div>
+
+      <div class="action-row">
+        <button class="btn-secondary" onclick="goToScreen(1)">Back to Edit</button>
+        <button class="btn-primary" id="btn-confirm">Approve & Continue ✓</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Result -->
+    <div class="screen" id="screen-3">
+      <h1 class="screen-title">Transformed Output</h1>
+      <p class="screen-sub" id="result-status-text">Your data successfully satisfies the target schema.</p>
+
+      <div class="json-output" id="json-output"></div>
+
+      <div class="action-row">
+        <div class="flex gap-8 items-center">
+          <button class="btn-ghost" onclick="goToScreen(2)">← Back</button>
+          <div class="save-strip">
+            <input type="text" id="mapping-name" placeholder="Name this mapping (e.g. Acme Corp)" />
+            <button class="btn-secondary" id="btn-save-mapping">Save Pipeline</button>
+          </div>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn-secondary" id="btn-download-csv">Download CSV</button>
+          <button class="btn-primary" id="copy-btn">Copy JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 4: Error -->
+    <div class="screen" id="screen-4">
+      <h1 class="screen-title" id="err-title" style="color: var(--red);">Transformation Failed</h1>
+      <p class="screen-sub" id="err-sub" style="font-size:1rem; max-width: 600px;">An error occurred.</p>
+      
+      <div class="action-row" style="justify-content: flex-start; gap: 16px;">
+        <button class="btn-secondary" onclick="goToScreen(1)">Back</button>
+        <button class="btn-primary" id="btn-retry">Retry Transform</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const API_BASE = window.location.origin;
+  let currentSource = null;
+  let currentSchema = null;
+  let lastResult    = null;
+  let savedMappings = JSON.parse(localStorage.getItem('fluxData_docs') || '[]');
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  function goToScreen(n) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + n).classList.add('active');
+    
+    [1, 2, 3].forEach(i => {
+      document.getElementById('s'+i).classList.toggle('active', i === n);
+      document.getElementById('s'+i).classList.toggle('done', i < n);
+    });
+    window.scrollTo({ top: 0 });
+  }
+
+  // Textarea Auto-Resize
+  function autoResize(el) {
+    el.style.height = 'auto'; // Reset to auto to get true scrollHeight
+    el.style.height = Math.max(250, el.scrollHeight + 2) + 'px'; // Set to scrollHeight, min 250px
+  }
+  
+  function clearInput(id) {
+    const el = document.getElementById(id);
+    el.value = '';
+    autoResize(el);
+    onInputChange();
+  }
+
+  // JSON Validation
+  function validateJson(str) {
+    try { JSON.parse(str); return true; } catch { return false; }
+  }
+
+  function onInputChange(e) {
+    const srcEl = document.getElementById('source-input');
+    const schEl = document.getElementById('schema-input');
+    
+    // Auto resize if this was triggered by input event directly
+    if (e && e.target) autoResize(e.target);
+
+    const srcRaw = srcEl.value.trim();
+    const schRaw = schEl.value.trim();
+    const srcOk  = srcRaw && validateJson(srcRaw);
+    const schOk  = schRaw && validateJson(schRaw);
+
+    document.getElementById('source-hint').textContent = srcRaw ? (srcOk ? '✓ Valid JSON' : 'Invalid JSON format') : '';
+    document.getElementById('source-hint').className = 'validation-hint ' + (srcOk ? 'ok' : 'bad');
+    srcEl.classList.toggle('error', srcRaw.length > 0 && !srcOk);
+    
+    document.getElementById('schema-hint').textContent = schRaw ? (schOk ? '✓ Valid JSON' : 'Invalid JSON format') : '';
+    document.getElementById('schema-hint').className = 'validation-hint ' + (schOk ? 'ok' : 'bad');
+    schEl.classList.toggle('error', schRaw.length > 0 && !schOk);
+
+    document.getElementById('btn-transform').disabled = !(srcOk && schOk);
+  }
+
+  document.getElementById('source-input').addEventListener('input', onInputChange);
+  document.getElementById('schema-input').addEventListener('input', onInputChange);
+
+  // CSV Upload using PapaParse
+  document.getElementById('csv-upload').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        const srcEl = document.getElementById('source-input');
+        srcEl.value = JSON.stringify(results.data, null, 2);
+        autoResize(srcEl);
+        onInputChange();
+        showToast('CSV loaded and converted to JSON');
+      },
+      error: function(err) {
+        showToast('Failed to parse CSV.');
+      }
+    });
+    // Reset file input
+    e.target.value = '';
+  });
+
+  // Load Example
+  document.getElementById('btn-load-example').addEventListener('click', () => {
+    const srcEl = document.getElementById('source-input');
+    const schEl = document.getElementById('schema-input');
+    srcEl.value = JSON.stringify([{
+      "supplier_id": "X-992",
+      "cost_usd": "14.99",
+      "in_stock": "Yes",
+      "product_title": "Wireless Mouse"
+    }, {
+      "supplier_id": "X-993",
+      "cost_usd": "29.50",
+      "in_stock": "No",
+      "product_title": "Mechanical Keyboard"
+    }], null, 2);
+    schEl.value = JSON.stringify({
+      "sku": "string",
+      "price": "number",
+      "available": "boolean",
+      "name": "string"
+    }, null, 2);
+    
+    autoResize(srcEl);
+    autoResize(schEl);
+    onInputChange();
+  });
+
+  // Transform
+  document.getElementById('btn-transform').addEventListener('click', async () => {
+    const srcRaw = document.getElementById('source-input').value.trim();
+    currentSource = JSON.parse(srcRaw);
+    currentSchema = JSON.parse(document.getElementById('schema-input').value.trim());
+
+    document.getElementById('loading-overlay').classList.add('show');
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/transform`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: currentSource, schema: currentSchema })
+      });
+      const data = await res.json();
+      document.getElementById('loading-overlay').classList.remove('show');
+
+      if (!data.success) {
+        showError(data.message || 'Transformation failed.');
+        return;
+      }
+
+      lastResult = data;
+      
+      let previewSource = Array.isArray(currentSource) ? currentSource[0] : currentSource;
+      let previewTarget = Array.isArray(data.transformed) ? data.transformed[0] : data.transformed;
+      
+      if (Array.isArray(currentSource) && !Array.isArray(data.transformed)) {
+         previewTarget = data.transformed;
+      }
+
+      buildMappingPreview(previewSource, currentSchema, previewTarget, data.meta);
+      goToScreen(2);
+    } catch (err) {
+      document.getElementById('loading-overlay').classList.remove('show');
+      showError('Network error. Ensure server is running.');
+    }
+  });
+
+  function buildMappingPreview(srcObj, schema, outObj, meta) {
+    const rows = document.getElementById('mapping-rows');
+    rows.innerHTML = '';
+    
+    Object.keys(schema).forEach(targetKey => {
+      const val = outObj ? outObj[targetKey] : null;
+      const isNull = val === null || val === undefined;
+      
+      let srcKey = '—';
+      if (srcObj) {
+        const flatSrc = Object.keys(srcObj);
+        srcKey = flatSrc.find(k => k.toLowerCase() === targetKey.toLowerCase()) || 
+                 flatSrc.find(k => k.toLowerCase().includes(targetKey.toLowerCase().replace(/_/g, ''))) || '—';
+      }
+
+      let dot = isNull ? 'dot-red' : (srcKey === '—' ? 'dot-amber' : 'dot-green');
+      let displayVal = isNull ? 'null' : String(val);
+      if (displayVal.length > 50) displayVal = displayVal.substring(0, 50) + '...';
+
+      rows.innerHTML += `
+        <div class="mapping-row">
+          <span class="field-name">${srcKey}</span>
+          <span class="field-arrow">→</span>
+          <div>
+            <span class="field-name" style="font-weight: 600; color: var(--text);">${targetKey}</span>
+            <span class="field-value">${displayVal}</span>
+          </div>
+          <div style="text-align:center"><span class="status-dot ${dot}"></span></div>
+        </div>
+      `;
+    });
+
+    document.getElementById('mapping-meta').innerHTML = `
+      <div class="meta-item"><span class="meta-num">${meta?.fields_mapped || 0}</span><span class="meta-lbl">Fields Mapped</span></div>
+      <div class="meta-item"><span class="meta-num">${meta?.fields_nulled || 0}</span><span class="meta-lbl">Fields Nulled</span></div>
+      <div class="meta-item"><span class="meta-num">${meta?.latency_ms || 0}ms</span><span class="meta-lbl">Response Time</span></div>
+    `;
+  }
+
+  document.getElementById('btn-confirm').addEventListener('click', () => {
+    document.getElementById('json-output').textContent = JSON.stringify(lastResult.transformed, null, 2);
+    goToScreen(3);
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(JSON.stringify(lastResult.transformed, null, 2));
+    showToast('JSON Copied to clipboard!');
+  });
+
+  // Download CSV
+  document.getElementById('btn-download-csv').addEventListener('click', () => {
+    let dataToConvert = lastResult.transformed;
+    if (!Array.isArray(dataToConvert)) dataToConvert = [dataToConvert];
+    
+    const csv = Papa.unparse(dataToConvert);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'transformed_data.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Starting CSV download...');
+  });
+
+  function showError(sub) {
+    document.getElementById('err-sub').textContent = sub;
+    goToScreen(4);
+  }
+  document.getElementById('btn-retry').addEventListener('click', () => document.getElementById('btn-transform').click());
+
+  // Saved mappings
+  function renderSaved() {
+    const sel = document.getElementById('saved-mappings');
+    sel.innerHTML = '<option value="" disabled selected>Saved Mappings</option>';
+    savedMappings.forEach((m, i) => {
+      sel.innerHTML += `<option value="${i}">${m.name}</option>`;
+    });
+  }
+  
+  const sel = document.getElementById('saved-mappings');
+  if(sel) {
+    sel.addEventListener('change', (e) => {
+      const m = savedMappings[e.target.value];
+      const srcEl = document.getElementById('source-input');
+      const schEl = document.getElementById('schema-input');
+      
+      srcEl.value = JSON.stringify(m.source, null, 2);
+      schEl.value = JSON.stringify(m.schema, null, 2);
+      
+      autoResize(srcEl);
+      autoResize(schEl);
+      onInputChange();
+      
+      showToast(`Loaded "${m.name}"`);
+      e.target.value = "";
+    });
+  }
+
+  document.getElementById('btn-save-mapping').addEventListener('click', () => {
+    const name = document.getElementById('mapping-name').value;
+    if (!name) return showToast('Please enter a name first');
+    savedMappings.push({ name, source: currentSource, schema: currentSchema });
+    localStorage.setItem('fluxData_docs', JSON.stringify(savedMappings));
+    renderSaved();
+    showToast('Mapping schema saved!');
+    document.getElementById('mapping-name').value = '';
+  });
+  
+  // Initial init
+  renderSaved();
+</script>
+</body>
+</html>
